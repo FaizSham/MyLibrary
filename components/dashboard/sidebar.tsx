@@ -1,0 +1,73 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
+  Settings,
+  Library,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const navigation = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Books", href: "/dashboard/books", icon: BookOpen },
+  { name: "Borrowers", href: "/dashboard/borrowers", icon: Users },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+];
+
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+  const pathname = usePathname();
+
+  return (
+    <div className={mobile ? "flex flex-col h-full" : "hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col"}>
+      <div className={`flex grow flex-col gap-y-5 overflow-y-auto bg-stone-50 px-6 pb-4 ${mobile ? "" : "border-r border-stone-200"}`}>
+        <div className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+            <Library className="h-5 w-5" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-stone-900">BukuGo</span>
+        </div>
+        <nav className="flex flex-1 flex-col">
+          <ul role="list" className="flex flex-1 flex-col gap-y-7">
+            <li>
+              <ul role="list" className="-mx-2 space-y-1">
+                {navigation.map((item) => {
+                  // For dashboard, match exactly. For other routes, match if pathname starts with href
+                  const isActive = item.href === "/dashboard" 
+                    ? pathname === "/dashboard"
+                    : pathname.startsWith(item.href);
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          "group flex gap-x-3 rounded-lg p-2 text-sm leading-6 font-semibold transition-colors",
+                          isActive
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                        )}
+                      >
+                        <item.icon
+                          className={cn(
+                            "h-6 w-6 shrink-0",
+                            isActive ? "text-indigo-600" : "text-stone-400 group-hover:text-indigo-600"
+                          )}
+                          aria-hidden="true"
+                        />
+                        {item.name}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  );
+}
+

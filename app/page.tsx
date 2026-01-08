@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { BookOpen, Users, LogIn, Library, Search, BarChart3, Star, BookCopy } from "lucide-react";
 
 export default function Home() {
@@ -15,10 +16,10 @@ export default function Home() {
             </div>
             <div className="text-xl font-bold tracking-tight text-stone-900">BukuGo</div>
           </div>
-          <button className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm">
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm">
             <LogIn className="h-4 w-4" />
             Log In
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -43,9 +44,9 @@ export default function Home() {
                   Say goodbye to spreadsheets and clunky software. BukuGo is the breezy, modern CMS designed for community libraries, schools, and private collections.
                 </p>
                 <div className="mt-8 flex items-center justify-center gap-x-6 lg:justify-start">
-                  <button className="rounded-xl bg-indigo-600 px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 hover:shadow-indigo-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                  <Link href="/dashboard" className="rounded-xl bg-indigo-600 px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 hover:shadow-indigo-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                     Get Started for Free
-                  </button>
+                  </Link>
                   <a href="#features" className="text-sm font-semibold leading-6 text-stone-900 hover:text-indigo-600 transition-colors">
                     Learn more <span aria-hidden="true">→</span>
                   </a>
