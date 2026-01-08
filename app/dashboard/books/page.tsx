@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   BookOpen,
   Plus,
@@ -28,8 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -40,6 +42,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -61,6 +73,8 @@ export default function BooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [viewingBook, setViewingBook] = useState<Book | null>(null);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
@@ -171,40 +185,67 @@ export default function BooksPage() {
     setIsDialogOpen(true);
   };
 
-  const handleAddBook = (e: React.FormEvent) => {
+  const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newBook: Book = {
-      id: String(books.length + 1),
-      title: formData.title,
-      author: formData.author,
-      isbn: formData.isbn,
-      genre: formData.genre,
-      publishedYear: parseInt(formData.publishedYear),
-      quantity: parseInt(formData.quantity),
-      status: "available",
-    };
-    setBooks([newBook, ...books]);
-    resetForm();
-    setIsDialogOpen(false);
+    setIsLoading(true);
+    
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const newBook: Book = {
+        id: String(books.length + 1),
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        genre: formData.genre,
+        publishedYear: parseInt(formData.publishedYear),
+        quantity: parseInt(formData.quantity),
+        status: "available",
+      };
+      setBooks([newBook, ...books]);
+      resetForm();
+      setIsDialogOpen(false);
+      toast.success("Book added successfully", {
+        description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
+      });
+    } catch {
+      toast.error("Failed to add book", {
+        description: "Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditBook = (e: React.FormEvent) => {
+  const handleEditBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBook) return;
+    setIsLoading(true);
 
-    const updatedBook: Book = {
-      ...editingBook,
-      title: formData.title,
-      author: formData.author,
-      isbn: formData.isbn,
-      genre: formData.genre,
-      publishedYear: parseInt(formData.publishedYear),
-      quantity: parseInt(formData.quantity),
-    };
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const updatedBook: Book = {
+        ...editingBook,
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        genre: formData.genre,
+        publishedYear: parseInt(formData.publishedYear),
+        quantity: parseInt(formData.quantity),
+      };
 
-    setBooks(books.map((book) => (book.id === editingBook.id ? updatedBook : book)));
-    resetForm();
-    setIsDialogOpen(false);
+      setBooks(books.map((book) => (book.id === editingBook.id ? updatedBook : book)));
+      resetForm();
+      setIsDialogOpen(false);
+      toast.success("Book updated successfully", {
+        description: `${updatedBook.title} has been updated.`,
+      });
+    } catch {
+      toast.error("Failed to update book", {
+        description: "Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDialogClose = (open: boolean) => {
@@ -234,11 +275,15 @@ export default function BooksPage() {
           text: `I found this great book: "${book.title}"`,
           url: shareUrl,
         });
+        toast.success("Book shared successfully");
       } else {
         // Fallback to clipboard
         await navigator.clipboard.writeText(shareUrl);
         setCopiedBookId(book.id);
         setTimeout(() => setCopiedBookId(null), 2000);
+        toast.info("Link copied to clipboard", {
+          description: "Share this link with others to view the book.",
+        });
       }
     } catch {
       // If share fails or is cancelled, fallback to clipboard
@@ -246,8 +291,13 @@ export default function BooksPage() {
         await navigator.clipboard.writeText(shareUrl);
         setCopiedBookId(book.id);
         setTimeout(() => setCopiedBookId(null), 2000);
-      } catch (clipboardError) {
-        console.error("Failed to copy to clipboard:", clipboardError);
+        toast.info("Link copied to clipboard", {
+          description: "Share this link with others to view the book.",
+        });
+      } catch {
+        toast.error("Failed to copy link", {
+          description: "Please try again later.",
+        });
       }
     }
   };
@@ -257,27 +307,26 @@ export default function BooksPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (bookToDelete) {
+  const handleConfirmDelete = async () => {
+    if (!bookToDelete) return;
+    setIsDeleting(true);
+    
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const deletedTitle = bookToDelete.title;
       setBooks(books.filter((book) => book.id !== bookToDelete.id));
       setBookToDelete(null);
       setIsDeleteDialogOpen(false);
+      toast.success("Book deleted successfully", {
+        description: `${deletedTitle} has been removed from your collection.`,
+      });
+    } catch {
+      toast.error("Failed to delete book", {
+        description: "Please try again later.",
+      });
+    } finally {
+      setIsDeleting(false);
     }
-  };
-
-  const getStatusBadge = (status: Book["status"]) => {
-    const variants = {
-      available: { variant: "default" as const, className: "bg-green-50 text-green-700 border-green-200" },
-      loaned: { variant: "secondary" as const, className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-      overdue: { variant: "destructive" as const, className: "bg-red-50 text-red-700 border-red-200" },
-    } as const;
-
-    const config = variants[status];
-    return (
-      <Badge variant={config.variant} className={config.className}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
   };
 
   return (
@@ -285,19 +334,19 @@ export default function BooksPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-stone-900">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Books
           </h1>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Manage your library collection
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
             <Button
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${viewMode === "list" ? "bg-indigo-50 text-indigo-600" : "text-stone-600 hover:text-stone-900"}`}
+              className={`h-8 w-8 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
               onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
@@ -305,7 +354,7 @@ export default function BooksPage() {
             <Button
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${viewMode === "grid" ? "bg-indigo-50 text-indigo-600" : "text-stone-600 hover:text-stone-900"}`}
+              className={`h-8 w-8 ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
               onClick={() => setViewMode("grid")}
             >
               <Grid3x3 className="h-4 w-4" />
@@ -321,9 +370,9 @@ export default function BooksPage() {
                 Add New Book
               </Button>
             </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-border">
             <form onSubmit={dialogMode === "edit" ? handleEditBook : handleAddBook} className="flex flex-col h-full max-h-[90vh]">
-              <div className="px-6 py-6 border-b">
+              <div className="px-6 py-6 border-b border-border">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold">
                     {dialogMode === "edit" ? "Edit Book" : "Add New Book"}
@@ -350,6 +399,7 @@ export default function BooksPage() {
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="grid gap-2 sm:col-span-2">
@@ -360,6 +410,7 @@ export default function BooksPage() {
                           value={formData.author}
                           onChange={(e) => setFormData({ ...formData, author: e.target.value })}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                     </div>
@@ -378,6 +429,7 @@ export default function BooksPage() {
                           onChange={(e) => setFormData({ ...formData, isbn: e.target.value })}
                           className="font-mono text-sm"
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="grid gap-2">
@@ -388,6 +440,7 @@ export default function BooksPage() {
                           value={formData.genre}
                           onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="grid gap-2">
@@ -399,6 +452,7 @@ export default function BooksPage() {
                           value={formData.publishedYear}
                           onChange={(e) => setFormData({ ...formData, publishedYear: e.target.value })}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="grid gap-2">
@@ -411,6 +465,7 @@ export default function BooksPage() {
                           value={formData.quantity}
                           onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                     </div>
@@ -418,18 +473,19 @@ export default function BooksPage() {
                 </div>
               </div>
 
-              <div className="p-6 pt-2 border-t">
+              <div className="p-6 pt-2 border-t border-border">
                 <DialogFooter className="gap-2 sm:gap-0">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => handleDialogClose(false)}
+                    disabled={isLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <LoadingButton type="submit" loading={isLoading} loadingText={dialogMode === "edit" ? "Saving..." : "Adding..."}>
                     {dialogMode === "edit" ? "Save Changes" : "Add Book"}
-                  </Button>
+                  </LoadingButton>
                 </DialogFooter>
               </div>
             </form>
@@ -438,13 +494,13 @@ export default function BooksPage() {
 
         {/* View Book Details Dialog */}
         <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogClose}>
-          <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-border">
             {viewingBook && (
               <div className="flex flex-col h-full max-h-[90vh]">
-                <div className="px-6 py-6 border-b">
+                <div className="px-6 py-6 border-b border-border">
                   <DialogHeader>
                     <div className="flex items-start gap-4">
-                      <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg border shadow-sm">
+                      <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg border border-border shadow-sm">
                         <BookOpen className="h-8 w-8 text-muted-foreground" />
                       </div>
                       <div className="space-y-1">
@@ -455,7 +511,7 @@ export default function BooksPage() {
                           {viewingBook.author}
                         </p>
                         <div className="pt-1">
-                           {getStatusBadge(viewingBook.status)}
+                           <StatusBadge status={viewingBook.status} />
                         </div>
                       </div>
                     </div>
@@ -493,10 +549,10 @@ export default function BooksPage() {
                     {(viewingBook.status === "loaned" || viewingBook.status === "overdue") && (
                        <div className="space-y-4">
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Loan Status</h4>
-                        <div className="rounded-xl border bg-muted/50 p-4 space-y-4">
+                        <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-4">
                           {viewingBook.borrowedBy && (
                             <div className="flex items-start gap-3">
-                              <div className="p-2 bg-background rounded-full shadow-sm border">
+                              <div className="p-2 bg-background rounded-full shadow-sm border border-border">
                                 <User className="h-4 w-4 text-muted-foreground" />
                               </div>
                               <div className="space-y-0.5">
@@ -507,7 +563,7 @@ export default function BooksPage() {
                           )}
                           {viewingBook.dueDate && (
                             <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-full shadow-sm border ${viewingBook.status === "overdue" ? "bg-destructive/10 border-destructive/20" : "bg-background"}`}>
+                              <div className={`p-2 rounded-full shadow-sm border ${viewingBook.status === "overdue" ? "bg-destructive/10 border-destructive/20" : "bg-background border-border"}`}>
                                 <Calendar className={`h-4 w-4 ${viewingBook.status === "overdue" ? "text-destructive" : "text-muted-foreground"}`} />
                               </div>
                               <div className="space-y-0.5">
@@ -528,7 +584,7 @@ export default function BooksPage() {
                   </div>
                 </div>
 
-                <div className="p-6 pt-2 border-t">
+                <div className="p-6 pt-2 border-t border-border">
                   <DialogFooter className="gap-2 sm:gap-0">
                     <Button
                       type="button"
@@ -572,90 +628,87 @@ export default function BooksPage() {
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden">
-             <div className="flex flex-col items-center justify-center p-6 text-center">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-destructive/10 mb-4">
-                  <AlertTriangle className="h-6 w-6 text-destructive" />
-                </div>
-                
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-xl font-bold text-center">
-                    Delete Book
-                  </DialogTitle>
-                  <DialogDescription className="text-center text-sm max-w-xs mx-auto">
-                    Are you sure you want to delete this book? This action cannot be undone.
-                  </DialogDescription>
-                </DialogHeader>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent className="sm:max-w-[400px] border-border">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-destructive/10 mb-4">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              
+              <AlertDialogHeader className="mb-4">
+                <AlertDialogTitle className="text-xl font-bold text-center">
+                  Delete Book
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-center text-sm max-w-xs mx-auto">
+                  Are you sure you want to delete this book? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
 
-                {bookToDelete && (
-                  <div className="w-full rounded-lg border bg-muted/50 p-3 mb-6">
-                    <div className="flex items-center gap-3 text-left">
-                       <div className="flex h-10 w-8 shrink-0 items-center justify-center rounded border shadow-sm">
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="font-semibold text-sm truncate">{bookToDelete.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{bookToDelete.author}</p>
-                      </div>
+              {bookToDelete && (
+                <div className="w-full rounded-lg border border-border bg-muted/50 p-3 mb-6">
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="flex h-10 w-8 shrink-0 items-center justify-center rounded border border-border shadow-sm">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold text-sm truncate">{bookToDelete.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{bookToDelete.author}</p>
                     </div>
                   </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDeleteDialogOpen(false);
-                      setBookToDelete(null);
-                    }}
-                    className="w-full"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleConfirmDelete}
-                    className="w-full"
-                  >
-                    Delete
-                  </Button>
                 </div>
-             </div>
-          </DialogContent>
-        </Dialog>
+              )}
+
+              <AlertDialogFooter className="grid grid-cols-2 gap-3 w-full">
+                <AlertDialogCancel
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false);
+                    setBookToDelete(null);
+                  }}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
         </div>
       </div>
 
       {/* Search and Filter Bar */}
-      <Card className="border-stone-200 bg-white shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader>
-          <CardTitle className="text-stone-900">Search & Filter</CardTitle>
-          <CardDescription className="text-stone-600">
+          <CardTitle>Search & Filter</CardTitle>
+          <CardDescription>
             Find books by title, author, ISBN, or genre
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search by title, author, ISBN, or genre..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-stone-200 bg-white pl-9 text-stone-900 placeholder:text-stone-500 focus:border-indigo-300 focus:ring-indigo-200"
+                className="pl-9"
               />
             </div>
             <div className="flex items-center gap-2 sm:w-[200px]">
-              <Filter className="h-4 w-4 text-stone-400" />
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="border-stone-200 text-stone-900">
+                <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
-                <SelectContent className="border-stone-200">
+                <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="available">Available</SelectItem>
                   <SelectItem value="loaned">Loaned</SelectItem>
@@ -664,26 +717,26 @@ export default function BooksPage() {
               </Select>
             </div>
           </div>
-          <div className="mt-4 text-sm text-stone-500">
+          <div className="mt-4 text-sm text-muted-foreground">
             Showing {filteredBooks.length} of {books.length} books
           </div>
         </CardContent>
       </Card>
 
       {/* Books Display */}
-      <Card className="border-stone-200 bg-white shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader>
-          <CardTitle className="text-stone-900">All Books</CardTitle>
-          <CardDescription className="text-stone-600">
+          <CardTitle>All Books</CardTitle>
+          <CardDescription>
             Complete list of books in your library collection.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {filteredBooks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <BookOpen className="h-12 w-12 text-stone-400 mb-4" />
-              <p className="text-lg font-medium text-stone-900">No books found</p>
-              <p className="text-sm text-stone-500 mt-2">
+              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-foreground">No books found</p>
+              <p className="text-sm text-muted-foreground mt-2">
                 {searchQuery || statusFilter !== "all"
                   ? "Try adjusting your search or filter criteria."
                   : "Get started by adding your first book."}
@@ -693,52 +746,53 @@ export default function BooksPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-stone-200 hover:bg-transparent">
-                    <TableHead className="w-[80px] text-stone-500 font-semibold uppercase tracking-wider">Cover</TableHead>
-                    <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">Title</TableHead>
-                    <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">Author</TableHead>
-                    <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">ISBN</TableHead>
-                    <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">Genre</TableHead>
-                    <TableHead className="w-[100px] text-stone-500 font-semibold uppercase tracking-wider">Year</TableHead>
-                    <TableHead className="w-[100px] text-stone-500 font-semibold uppercase tracking-wider">Quantity</TableHead>
-                    <TableHead className="w-[120px] text-stone-500 font-semibold uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="w-[100px] text-right text-stone-500 font-semibold uppercase tracking-wider">Actions</TableHead>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="w-[80px] text-muted-foreground font-semibold uppercase tracking-wider">Cover</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Title</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Author</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">ISBN</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Genre</TableHead>
+                    <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Year</TableHead>
+                    <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Quantity</TableHead>
+                    <TableHead className="w-[120px] text-muted-foreground font-semibold uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="w-[100px] text-right text-muted-foreground font-semibold uppercase tracking-wider">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedBooks.map((book) => (
                     <TableRow 
                       key={book.id} 
-                      className="border-stone-200 hover:bg-stone-50 transition-colors cursor-pointer"
+                      className="border-border hover:bg-accent transition-colors cursor-pointer"
                       onClick={() => handleOpenViewDialog(book)}
                     >
                       <TableCell>
-                        <div className="flex h-12 w-10 items-center justify-center rounded-lg bg-stone-100 ring-1 ring-stone-200">
-                          <BookOpen className="h-6 w-6 text-stone-400" />
+                        <div className="flex h-12 w-10 items-center justify-center rounded-lg bg-muted ring-1 ring-border">
+                          <BookOpen className="h-6 w-6 text-muted-foreground" />
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-stone-900">
+                      <TableCell className="font-medium text-foreground">
                         {book.title}
                       </TableCell>
-                      <TableCell className="text-stone-600">{book.author}</TableCell>
-                      <TableCell className="font-mono text-sm text-stone-500">
+                      <TableCell className="text-muted-foreground">{book.author}</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
                         {book.isbn}
                       </TableCell>
-                      <TableCell className="text-stone-600">{book.genre}</TableCell>
-                      <TableCell className="text-stone-600">{book.publishedYear}</TableCell>
-                      <TableCell className="text-stone-600">{book.quantity}</TableCell>
-                      <TableCell>{getStatusBadge(book.status)}</TableCell>
+                      <TableCell className="text-muted-foreground">{book.genre}</TableCell>
+                      <TableCell className="text-muted-foreground">{book.publishedYear}</TableCell>
+                      <TableCell className="text-muted-foreground">{book.quantity}</TableCell>
+                      <TableCell><StatusBadge status={book.status} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                             onClick={() => handleShareBook(book)}
                             title="Share book"
+                            aria-label="Share book"
                           >
                             {copiedBookId === book.id ? (
-                              <Check className="h-4 w-4 text-green-600" />
+                              <Check className="h-4 w-4 text-primary" />
                             ) : (
                               <Share2 className="h-4 w-4" />
                             )}
@@ -746,18 +800,20 @@ export default function BooksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
                             onClick={() => handleOpenEditDialog(book)}
                             title="Edit book"
+                            aria-label="Edit book"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleOpenDeleteDialog(book)}
                             title="Delete book"
+                            aria-label="Delete book"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -773,34 +829,35 @@ export default function BooksPage() {
               {filteredBooks.map((book) => (
                 <Card 
                   key={book.id} 
-                  className="group border-stone-200 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
+                  className="group border-border shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
                   onClick={() => handleOpenViewDialog(book)}
                 >
                   <CardContent className="p-4">
-                    <div className="mb-4 flex h-32 w-full items-center justify-center rounded-lg bg-stone-100 ring-1 ring-stone-200">
-                      <BookOpen className="h-12 w-12 text-stone-400" />
+                    <div className="mb-4 flex h-32 w-full items-center justify-center rounded-lg bg-muted ring-1 ring-border">
+                      <BookOpen className="h-12 w-12 text-muted-foreground" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-stone-900 line-clamp-2">
+                      <h3 className="font-semibold text-foreground line-clamp-2">
                         {book.title}
                       </h3>
-                      <p className="text-sm text-stone-600">{book.author}</p>
+                      <p className="text-sm text-muted-foreground">{book.author}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-stone-500">{book.genre}</span>
-                        {getStatusBadge(book.status)}
+                        <span className="text-xs text-muted-foreground">{book.genre}</span>
+                        <StatusBadge status={book.status} />
                       </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-stone-100" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-xs text-stone-500">Qty: {book.quantity}</span>
+                      <div className="flex items-center justify-between pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs text-muted-foreground">Qty: {book.quantity}</span>
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
                             onClick={() => handleShareBook(book)}
                             title="Share book"
+                            aria-label="Share book"
                           >
                             {copiedBookId === book.id ? (
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 text-primary" />
                             ) : (
                               <Share2 className="h-3.5 w-3.5" />
                             )}
@@ -808,18 +865,20 @@ export default function BooksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
                             onClick={() => handleOpenEditDialog(book)}
                             title="Edit book"
+                            aria-label="Edit book"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleOpenDeleteDialog(book)}
                             title="Delete book"
+                            aria-label="Delete book"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -834,11 +893,11 @@ export default function BooksPage() {
 
           {/* Pagination Controls */}
           {filteredBooks.length > 0 && (
-            <div className="border-t border-stone-200 px-6 py-4">
+            <div className="border-t border-border px-6 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 {/* Page Size Selector */}
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="pageSize" className="text-sm text-stone-600 whitespace-nowrap">
+                  <Label htmlFor="pageSize" className="text-sm text-muted-foreground whitespace-nowrap">
                     Rows per page:
                   </Label>
                   <Select
@@ -848,10 +907,10 @@ export default function BooksPage() {
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger id="pageSize" className="w-[80px] border-stone-200 text-stone-900">
+                    <SelectTrigger id="pageSize" className="w-[80px]">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-stone-200">
+                    <SelectContent>
                       <SelectItem value="5">5</SelectItem>
                       <SelectItem value="10">10</SelectItem>
                       <SelectItem value="20">20</SelectItem>
@@ -864,14 +923,14 @@ export default function BooksPage() {
                 {/* Page Info and Navigation */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
                   {/* Page Info */}
-                  <div className="text-sm text-stone-600">
-                    Showing <span className="font-medium text-stone-900">
+                  <div className="text-sm text-muted-foreground">
+                    Showing <span className="font-medium text-foreground">
                       {filteredBooks.length === 0 ? 0 : startIndex + 1}
                     </span> to{" "}
-                    <span className="font-medium text-stone-900">
+                    <span className="font-medium text-foreground">
                       {Math.min(endIndex, filteredBooks.length)}
                     </span> of{" "}
-                    <span className="font-medium text-stone-900">
+                    <span className="font-medium text-foreground">
                       {filteredBooks.length}
                     </span> books
                   </div>
@@ -883,7 +942,6 @@ export default function BooksPage() {
                       size="sm"
                       onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       <span className="sr-only">Previous page</span>
@@ -909,11 +967,6 @@ export default function BooksPage() {
                             variant={currentPage === pageNum ? "default" : "outline"}
                             size="sm"
                             onClick={() => setCurrentPage(pageNum)}
-                            className={
-                              currentPage === pageNum
-                                ? "bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-600"
-                                : "border-stone-200 text-stone-700 hover:bg-stone-50"
-                            }
                           >
                             {pageNum}
                           </Button>
@@ -926,7 +979,6 @@ export default function BooksPage() {
                       size="sm"
                       onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                       disabled={currentPage === totalPages}
-                      className="border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <ChevronRight className="h-4 w-4" />
                       <span className="sr-only">Next page</span>

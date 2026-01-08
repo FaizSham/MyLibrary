@@ -8,6 +8,7 @@ import {
   UserPlus,
   Plus,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -17,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,7 @@ import type { Book } from "@/data/mock-books";
 export default function DashboardPage() {
   const [books, setBooks] = useState<Book[]>(mockBooks);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -45,36 +48,37 @@ export default function DashboardPage() {
     quantity: "1",
   });
 
-  const handleAddBook = (e: React.FormEvent) => {
+  const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newBook: Book = {
-      id: String(books.length + 1),
-      title: formData.title,
-      author: formData.author,
-      isbn: formData.isbn,
-      genre: formData.genre,
-      publishedYear: parseInt(formData.publishedYear),
-      quantity: parseInt(formData.quantity),
-      status: "available",
-    };
-    setBooks([newBook, ...books]);
-    setFormData({ title: "", author: "", isbn: "", genre: "", publishedYear: "", quantity: "1" });
-    setIsDialogOpen(false);
-  };
-
-  const getStatusBadge = (status: Book["status"]) => {
-    const variants = {
-      available: { variant: "default" as const, className: "bg-green-50 text-green-700 border-green-200" },
-      loaned: { variant: "secondary" as const, className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-      overdue: { variant: "destructive" as const, className: "bg-red-50 text-red-700 border-red-200" },
-    } as const;
-
-    const config = variants[status];
-    return (
-      <Badge variant={config.variant} className={config.className}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
+    setIsLoading(true);
+    
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    
+    try {
+      const newBook: Book = {
+        id: String(books.length + 1),
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        genre: formData.genre,
+        publishedYear: parseInt(formData.publishedYear),
+        quantity: parseInt(formData.quantity),
+        status: "available",
+      };
+      setBooks([newBook, ...books]);
+      setFormData({ title: "", author: "", isbn: "", genre: "", publishedYear: "", quantity: "1" });
+      setIsDialogOpen(false);
+      toast.success("Book added successfully", {
+        description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
+      });
+    } catch {
+      toast.error("Failed to add book", {
+        description: "Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -82,31 +86,31 @@ export default function DashboardPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-stone-900">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Dashboard
           </h1>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Overview of your library management system
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm">
+            <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Add New Book
             </Button>
           </DialogTrigger>
-          <DialogContent className="border-stone-200">
+          <DialogContent className="border-border">
             <form onSubmit={handleAddBook}>
               <DialogHeader>
-                <DialogTitle className="text-stone-900">Add New Book</DialogTitle>
-                <DialogDescription className="text-stone-600">
+                <DialogTitle>Add New Book</DialogTitle>
+                <DialogDescription>
                   Enter the book details to add it to your collection.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="title" className="text-stone-700">Title</Label>
+                  <Label htmlFor="title">Title</Label>
                   <Input
                     id="title"
                     placeholder="The Great Gatsby"
@@ -114,12 +118,12 @@ export default function DashboardPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, title: e.target.value })
                     }
-                    className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="author" className="text-stone-700">Author</Label>
+                  <Label htmlFor="author">Author</Label>
                   <Input
                     id="author"
                     placeholder="F. Scott Fitzgerald"
@@ -127,13 +131,13 @@ export default function DashboardPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, author: e.target.value })
                     }
-                    className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="isbn" className="text-stone-700">ISBN</Label>
+                    <Label htmlFor="isbn">ISBN</Label>
                     <Input
                       id="isbn"
                       placeholder="978-0-7432-7356-5"
@@ -141,12 +145,12 @@ export default function DashboardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, isbn: e.target.value })
                       }
-                      className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="quantity" className="text-stone-700">Quantity</Label>
+                    <Label htmlFor="quantity">Quantity</Label>
                     <Input
                       id="quantity"
                       type="number"
@@ -156,14 +160,14 @@ export default function DashboardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, quantity: e.target.value })
                       }
-                      className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="genre" className="text-stone-700">Genre</Label>
+                    <Label htmlFor="genre">Genre</Label>
                     <Input
                       id="genre"
                       placeholder="Fiction"
@@ -171,12 +175,12 @@ export default function DashboardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, genre: e.target.value })
                       }
-                      className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="publishedYear" className="text-stone-700">Published Year</Label>
+                    <Label htmlFor="publishedYear">Published Year</Label>
                     <Input
                       id="publishedYear"
                       type="number"
@@ -185,8 +189,8 @@ export default function DashboardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, publishedYear: e.target.value })
                       }
-                      className="border-stone-200 focus:border-indigo-300 focus:ring-indigo-200"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -196,11 +200,13 @@ export default function DashboardPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
-                  className="border-stone-200 text-stone-700 hover:bg-stone-50"
+                  disabled={isLoading}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white">Add Book</Button>
+                <LoadingButton type="submit" loading={isLoading} loadingText="Adding...">
+                  Add Book
+                </LoadingButton>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -209,58 +215,58 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-stone-200 bg-white shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-stone-600">Total Books</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50">
-              <BookOpen className="h-5 w-5 text-indigo-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Books</CardTitle>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <BookOpen className="h-5 w-5 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-stone-900">{mockStats.totalBooks.toLocaleString()}</div>
-            <p className="text-xs text-stone-500 mt-1">
+            <div className="text-2xl font-bold text-foreground">{mockStats.totalBooks.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               +12% from last month
             </p>
           </CardContent>
         </Card>
-        <Card className="border-stone-200 bg-white shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-stone-600">Active Loans</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50">
-              <FileText className="h-5 w-5 text-indigo-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Loans</CardTitle>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <FileText className="h-5 w-5 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-stone-900">{mockStats.activeLoans}</div>
-            <p className="text-xs text-stone-500 mt-1">
+            <div className="text-2xl font-bold text-foreground">{mockStats.activeLoans}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {Math.round((mockStats.activeLoans / mockStats.totalBooks) * 100)}% of collection
             </p>
           </CardContent>
         </Card>
-        <Card className="border-stone-200 bg-white shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-stone-600">Overdue Books</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50">
-              <AlertCircle className="h-5 w-5 text-red-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Books</CardTitle>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
+              <AlertCircle className="h-5 w-5 text-destructive" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{mockStats.overdueBooks}</div>
-            <p className="text-xs text-stone-500 mt-1">
+            <div className="text-2xl font-bold text-destructive">{mockStats.overdueBooks}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               Requires attention
             </p>
           </CardContent>
         </Card>
-        <Card className="border-stone-200 bg-white shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-stone-600">New Members</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50">
-              <UserPlus className="h-5 w-5 text-indigo-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">New Members</CardTitle>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <UserPlus className="h-5 w-5 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-stone-900">{mockStats.newMembers}</div>
-            <p className="text-xs text-stone-500 mt-1">
+            <div className="text-2xl font-bold text-foreground">{mockStats.newMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               This month
             </p>
           </CardContent>
@@ -268,42 +274,52 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Books Table */}
-      <Card className="border-stone-200 bg-white shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader>
-          <CardTitle className="text-stone-900">Recent Books</CardTitle>
-          <CardDescription className="text-stone-600">
+          <CardTitle>Recent Books</CardTitle>
+          <CardDescription>
             A list of recently added books in your collection.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-stone-200 hover:bg-transparent">
-                <TableHead className="w-[100px] text-stone-500 font-semibold uppercase tracking-wider">Cover</TableHead>
-                <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">Title</TableHead>
-                <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">Author</TableHead>
-                <TableHead className="text-stone-500 font-semibold uppercase tracking-wider">ISBN</TableHead>
-                <TableHead className="text-right text-stone-500 font-semibold uppercase tracking-wider">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {books.map((book) => (
-                <TableRow key={book.id} className="border-stone-200 hover:bg-stone-50 transition-colors">
-                  <TableCell>
-                    <div className="flex h-12 w-10 items-center justify-center rounded-lg bg-stone-100 ring-1 ring-stone-200">
-                      <BookOpen className="h-6 w-6 text-stone-400" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium text-stone-900">{book.title}</TableCell>
-                  <TableCell className="text-stone-600">{book.author}</TableCell>
-                  <TableCell className="font-mono text-sm text-stone-500">{book.isbn}</TableCell>
-                  <TableCell className="text-right">
-                    {getStatusBadge(book.status)}
-                  </TableCell>
+          {books.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-foreground">No books found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Get started by adding your first book.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Cover</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Title</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Author</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">ISBN</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-semibold uppercase tracking-wider">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {books.map((book) => (
+                  <TableRow key={book.id} className="border-border hover:bg-accent transition-colors">
+                    <TableCell>
+                      <div className="flex h-12 w-10 items-center justify-center rounded-lg bg-muted ring-1 ring-border">
+                        <BookOpen className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium text-foreground">{book.title}</TableCell>
+                    <TableCell className="text-muted-foreground">{book.author}</TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">{book.isbn}</TableCell>
+                    <TableCell className="text-right">
+                      <StatusBadge status={book.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
