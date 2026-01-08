@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Menu, Bell } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Menu, Bell, ChevronRight, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,37 +17,72 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 
 export function Header() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const pathname = usePathname();
+  const segments = pathname.split("/").filter(Boolean);
+  
+  // Helper to format segment names (e.g., "new-books" -> "New Books")
+  const formatSegment = (segment: string) => {
+    return segment
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   return (
     <>
-      {/* Mobile Sidebar */}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
-          <Sidebar mobile />
-        </SheetContent>
-      </Sheet>
+      {/* Header */}
+      <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-x-4 border-b border-stone-200 bg-white/80 backdrop-blur-md px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4 lg:gap-6">
+          {/* Mobile Menu Trigger */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="lg:hidden -ml-2 text-stone-500 hover:text-stone-900">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0">
+              <Sidebar mobile />
+            </SheetContent>
+          </Sheet>
 
-      {/* Desktop Header */}
-      <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-stone-200 bg-white/80 backdrop-blur-md px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
-        <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-          <div className="relative flex flex-1 items-center">
-            <Search className="absolute left-3 h-5 w-5 text-stone-400" />
-            <Input
-              type="search"
-              placeholder="Search books, members, or loans..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full max-w-lg border-stone-200 bg-white pl-10 text-stone-900 placeholder:text-stone-500 focus:border-indigo-300 focus:ring-indigo-200"
-            />
-          </div>
-          <div className="flex items-center gap-x-4 lg:gap-x-6">
+           {/* Breadcrumbs */}
+           <nav className="hidden sm:flex items-center text-sm font-medium text-stone-500">
+            <Link 
+              href="/dashboard" 
+              className="flex items-center hover:text-stone-900 transition-colors"
+            >
+              <Home className="h-4 w-4" />
+            </Link>
+            {segments.map((segment, index) => {
+              // Skip "dashboard" as it's the home icon
+              if (segment === "dashboard" && index === 0) return null;
+
+              const href = `/${segments.slice(0, index + 1).join("/")}`;
+              const isLast = index === segments.length - 1;
+
+              return (
+                <div key={href} className="flex items-center">
+                  <ChevronRight className="h-4 w-4 mx-2 text-stone-400" />
+                  {isLast ? (
+                    <span className="text-stone-900 font-semibold">
+                      {formatSegment(segment)}
+                    </span>
+                  ) : (
+                    <Link 
+                      href={href}
+                      className="hover:text-stone-900 transition-colors"
+                    >
+                      {formatSegment(segment)}
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-x-4 lg:gap-x-6">
             <Button variant="ghost" size="icon" className="relative text-stone-600 hover:text-stone-900">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1 right-1 flex h-2 w-2">
@@ -82,7 +117,6 @@ export function Header() {
                 <DropdownMenuItem className="text-stone-700 hover:bg-stone-100">Log out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
         </div>
       </header>
     </>

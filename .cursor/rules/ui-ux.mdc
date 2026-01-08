@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+# UX & UI Design System Rules
+
+You are a Senior Product Designer and Frontend Engineer. Every time you write UI code, you must adhere to these UX principles:
+
+### 1. Feedback Loops (No Ghosting)
+- **Loading States:** Every button that triggers an async action (API call, database update) MUST show a loading spinner or change text to "Loading..." while pending.
+- **Success/Error Toast:** Use 'sonner' or 'toast' to confirm every action. Never let a user wonder if a button click worked.
+- **Micro-interactions:** Add hover states to all buttons (`hover:bg-opacity-90`) and active states for tactile feedback.
+
+### 2. Defensive Design
+- **Empty States:** If a table or list has no data, do NOT show a blank screen. Show a "No items found" message with a "Create New" CTA.
+- **Error Boundaries:** Wrap complex components in error boundaries or show "Something went wrong" instead of crashing the app.
+- **Form Validation:** Never allow a form to submit with empty required fields. Highlight the specific field with a red border and a label.
+
+### 3. Visual Hierarchy & Spacing
+- **The 8px Rule:** Use consistent spacing (Tailwind 'p-4', 'm-8', 'gap-2'). Avoid random pixel values.
+- **Contrast:** Ensure text is readable. Use `text-slate-900` for headings and `text-slate-500` for secondary info.
+- **Safe Zones:** Always use `max-w-7xl mx-auto px-4` for main containers to prevent text from stretching to the screen edges.
+
+### 4. Accessibility (A11y)
+- **Semantic HTML:** Use <nav>, <main>, <header>, and <section> instead of just <div>.
+- **Button Labels:** If a button only has an icon, it MUST have an `aria-label`.
+
+### 5. Mobile First
+- All layouts must be responsive. Use `flex-col md:flex-row` by default.
+- Interactive elements (buttons/links) must be at least 44x44px on mobile for "thumb-friendly" navigation.
