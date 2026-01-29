@@ -2,7 +2,40 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Set Up Supabase
+
+1. Create a project at [Supabase Dashboard](https://app.supabase.com)
+2. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Fill in your Supabase credentials in `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL` - Your project URL (found in Project Settings > API)
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your anon/public key (found in Project Settings > API)
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your service role key (found in Project Settings > API)
+
+### 3. Set Up Database Schema
+
+Run the SQL migration in your Supabase SQL Editor:
+
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Copy and paste the contents of `supabase/migrations/001_initial_schema.sql`
+4. Run the migration
+
+This will create the `books` and `borrowers` tables with all necessary indexes and triggers.
+
+### 4. Run the Development Server
+
+```bash
+npm run dev
+```
 
 ```bash
 npm run dev

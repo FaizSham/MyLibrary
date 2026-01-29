@@ -1,6 +1,4 @@
 "use client";
-
-import { useState } from "react";
 import {
   BookOpen,
   FileText,
@@ -32,13 +30,46 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mockBooks, mockStats } from "@/data/mock-books";
+import { useEffect, useState } from "react";
 import type { Book } from "@/data/mock-books";
+import { getBooks, createBook } from "@/lib/actions/books";
+import { transformBook } from "@/lib/utils/transform";
 
 export default function DashboardPage() {
-  const [books, setBooks] = useState<Book[]>(mockBooks);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const { data, error } = await getBooks();
+        if (error) {
+          toast.error("Failed to load books", {
+            description: error.message || "Please try again later.",
+          });
+        } else {
+          setBooks(data.map(transformBook));
+        }
+      } catch (error) {
+        toast.error("Failed to load books", {
+          description: "Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBooks();
+  }, []);
+
+  // Calculate stats from books
+  const mockStats = {
+    totalBooks: books.length,
+    activeLoans: books.filter((b) => b.status === "loaned").length,
+    overdueBooks: books.filter((b) => b.status === "overdue").length,
+    newMembers: 0, // This would come from borrowers data
+  };
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -50,34 +81,38 @@ export default function DashboardPage() {
 
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    setIsSubmitting(true);
     
     try {
-      const newBook: Book = {
-        id: String(books.length + 1),
+      const { data, error } = await createBook({
         title: formData.title,
         author: formData.author,
         isbn: formData.isbn,
         genre: formData.genre,
-        publishedYear: parseInt(formData.publishedYear),
+        published_year: parseInt(formData.publishedYear),
         quantity: parseInt(formData.quantity),
         status: "available",
-      };
-      setBooks([newBook, ...books]);
-      setFormData({ title: "", author: "", isbn: "", genre: "", publishedYear: "", quantity: "1" });
-      setIsDialogOpen(false);
-      toast.success("Book added successfully", {
-        description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
       });
-    } catch {
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const newBook = transformBook(data);
+        setBooks([newBook, ...books]);
+        setFormData({ title: "", author: "", isbn: "", genre: "", publishedYear: "", quantity: "1" });
+        setIsDialogOpen(false);
+        toast.success("Book added successfully", {
+          description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
+        });
+      }
+    } catch (error) {
       toast.error("Failed to add book", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -119,7 +154,7 @@ export default function DashboardPage() {
                       setFormData({ ...formData, title: e.target.value })
                     }
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -132,7 +167,7 @@ export default function DashboardPage() {
                       setFormData({ ...formData, author: e.target.value })
                     }
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -146,7 +181,7 @@ export default function DashboardPage() {
                         setFormData({ ...formData, isbn: e.target.value })
                       }
                       required
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -161,7 +196,7 @@ export default function DashboardPage() {
                         setFormData({ ...formData, quantity: e.target.value })
                       }
                       required
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -176,7 +211,7 @@ export default function DashboardPage() {
                         setFormData({ ...formData, genre: e.target.value })
                       }
                       required
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -190,7 +225,7 @@ export default function DashboardPage() {
                         setFormData({ ...formData, publishedYear: e.target.value })
                       }
                       required
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -204,7 +239,7 @@ export default function DashboardPage() {
                 >
                   Cancel
                 </Button>
-                <LoadingButton type="submit" loading={isLoading} loadingText="Adding...">
+                <LoadingButton type="submit" loading={isSubmitting} loadingText="Adding...">
                   Add Book
                 </LoadingButton>
               </DialogFooter>

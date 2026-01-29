@@ -60,11 +60,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockBooks } from "@/data/mock-books";
 import type { Book } from "@/data/mock-books";
+import { getBooks, createBook, updateBook, deleteBook } from "@/lib/actions/books";
+import { transformBook } from "@/lib/utils/transform";
 
 export default function BooksPage() {
-  const [books, setBooks] = useState<Book[]>(mockBooks);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -91,6 +93,30 @@ export default function BooksPage() {
 
   const pathname = usePathname();
   const router = useRouter();
+
+  // Fetch books on mount
+  useEffect(() => {
+    const fetchBooks = async () => {
+      setIsInitialLoad(true);
+      try {
+        const { data, error } = await getBooks();
+        if (error) {
+          toast.error("Failed to load books", {
+            description: error.message || "Please try again later.",
+          });
+        } else {
+          setBooks(data.map(transformBook));
+        }
+      } catch (error) {
+        toast.error("Failed to load books", {
+          description: "Please try again later.",
+        });
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    fetchBooks();
+  }, []);
 
   const handleOpenViewDialog = (book: Book) => {
     setViewingBook(book);
@@ -190,26 +216,32 @@ export default function BooksPage() {
     setIsLoading(true);
     
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newBook: Book = {
-        id: String(books.length + 1),
+      const { data, error } = await createBook({
         title: formData.title,
         author: formData.author,
         isbn: formData.isbn,
         genre: formData.genre,
-        publishedYear: parseInt(formData.publishedYear),
+        published_year: parseInt(formData.publishedYear),
         quantity: parseInt(formData.quantity),
         status: "available",
-      };
-      setBooks([newBook, ...books]);
-      resetForm();
-      setIsDialogOpen(false);
-      toast.success("Book added successfully", {
-        description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
       });
-    } catch {
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const newBook = transformBook(data);
+        setBooks([newBook, ...books]);
+        resetForm();
+        setIsDialogOpen(false);
+        toast.success("Book added successfully", {
+          description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
+        });
+      }
+    } catch (error) {
       toast.error("Failed to add book", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsLoading(false);
@@ -222,26 +254,31 @@ export default function BooksPage() {
     setIsLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const updatedBook: Book = {
-        ...editingBook,
+      const { data, error } = await updateBook(editingBook.id, {
         title: formData.title,
         author: formData.author,
         isbn: formData.isbn,
         genre: formData.genre,
-        publishedYear: parseInt(formData.publishedYear),
+        published_year: parseInt(formData.publishedYear),
         quantity: parseInt(formData.quantity),
-      };
-
-      setBooks(books.map((book) => (book.id === editingBook.id ? updatedBook : book)));
-      resetForm();
-      setIsDialogOpen(false);
-      toast.success("Book updated successfully", {
-        description: `${updatedBook.title} has been updated.`,
       });
-    } catch {
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const updatedBook = transformBook(data);
+        setBooks(books.map((book) => (book.id === editingBook.id ? updatedBook : book)));
+        resetForm();
+        setIsDialogOpen(false);
+        toast.success("Book updated successfully", {
+          description: `${updatedBook.title} has been updated.`,
+        });
+      }
+    } catch (error) {
       toast.error("Failed to update book", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsLoading(false);
@@ -312,17 +349,22 @@ export default function BooksPage() {
     setIsDeleting(true);
     
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
       const deletedTitle = bookToDelete.title;
+      const { error } = await deleteBook(bookToDelete.id);
+
+      if (error) {
+        throw error;
+      }
+
       setBooks(books.filter((book) => book.id !== bookToDelete.id));
       setBookToDelete(null);
       setIsDeleteDialogOpen(false);
       toast.success("Book deleted successfully", {
         description: `${deletedTitle} has been removed from your collection.`,
       });
-    } catch {
+    } catch (error) {
       toast.error("Failed to delete book", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsDeleting(false);

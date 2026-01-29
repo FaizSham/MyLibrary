@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Users,
@@ -36,11 +36,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mockBorrowers, borrowerStats } from "@/data/mock-borrowers";
 import type { Borrower } from "@/data/mock-borrowers";
+import { getBorrowers, createBorrower } from "@/lib/actions/borrowers";
+import { transformBorrower } from "@/lib/utils/transform";
 
 export default function BorrowersPage() {
-  const [borrowers, setBorrowers] = useState<Borrower[]>(mockBorrowers);
+  const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,32 +53,70 @@ export default function BorrowersPage() {
     memberId: "",
   });
 
+  // Fetch borrowers on mount
+  useEffect(() => {
+    const fetchBorrowers = async () => {
+      setIsInitialLoad(true);
+      try {
+        const { data, error } = await getBorrowers();
+        if (error) {
+          toast.error("Failed to load borrowers", {
+            description: error.message || "Please try again later.",
+          });
+        } else {
+          setBorrowers(data.map(transformBorrower));
+        }
+      } catch (error) {
+        toast.error("Failed to load borrowers", {
+          description: "Please try again later.",
+        });
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    fetchBorrowers();
+  }, []);
+
+  // Calculate stats from borrowers
+  const borrowerStats = {
+    totalBorrowers: borrowers.length,
+    activeBorrowers: borrowers.filter((b) => b.status === "active").length,
+    inactiveBorrowers: borrowers.filter((b) => b.status === "inactive").length,
+    suspendedBorrowers: borrowers.filter((b) => b.status === "suspended").length,
+    totalFines: borrowers.reduce((sum, b) => sum + (b.fineAmount || 0), 0),
+  };
+
   const handleAddBorrower = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newBorrower: Borrower = {
-        id: String(borrowers.length + 1),
+      const memberId = formData.memberId || `MEM-${String(borrowers.length + 1).padStart(3, "0")}`;
+      const { data, error } = await createBorrower({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
-        memberId: formData.memberId || `MEM-${String(borrowers.length + 1).padStart(3, "0")}`,
-        joinDate: new Date().toISOString().split("T")[0],
-        activeLoans: 0,
-        totalLoans: 0,
+        phone: formData.phone || null,
+        member_id: memberId,
+        join_date: new Date().toISOString().split("T")[0],
         status: "active",
-      };
-      setBorrowers([newBorrower, ...borrowers]);
-      setFormData({ name: "", email: "", phone: "", memberId: "" });
-      setIsDialogOpen(false);
-      toast.success("Borrower added successfully", {
-        description: `${newBorrower.name} has been added to your library system.`,
       });
-    } catch {
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const newBorrower = transformBorrower(data);
+        setBorrowers([newBorrower, ...borrowers]);
+        setFormData({ name: "", email: "", phone: "", memberId: "" });
+        setIsDialogOpen(false);
+        toast.success("Borrower added successfully", {
+          description: `${newBorrower.name} has been added to your library system.`,
+        });
+      }
+    } catch (error) {
       toast.error("Failed to add borrower", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsLoading(false);
