@@ -39,10 +39,10 @@ export function transformBorrower(borrower: Borrower) {
     phone: borrower.phone || "",
     memberId: borrower.member_id,
     joinDate: borrower.join_date,
-    activeLoans: borrower.active_loans,
-    totalLoans: borrower.total_loans,
+    activeLoans: borrower.active_loans ?? 0,
+    totalLoans: borrower.total_loans ?? 0,
     status: borrower.status as "active" | "inactive" | "suspended",
-    fineAmount: Number(borrower.fine_amount) || undefined,
+    fineAmount: borrower.fine_amount != null ? Number(borrower.fine_amount) : undefined,
   };
 }
 

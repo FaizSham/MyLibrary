@@ -182,8 +182,8 @@ export async function createLoan(
     const { error: borrowerUpdateError } = await supabase
       .from("borrowers")
       .update({
-        active_loans: borrower.active_loans + 1,
-        total_loans: borrower.total_loans + 1,
+        active_loans: (borrower.active_loans ?? 0) + 1,
+        total_loans: (borrower.total_loans ?? 0) + 1,
       })
       .eq("id", borrowerId);
 
@@ -277,7 +277,7 @@ export async function returnLoan(id: string) {
     const { error: borrowerUpdateError } = await supabase
       .from("borrowers")
       .update({
-        active_loans: Math.max(0, borrower.active_loans - 1),
+        active_loans: Math.max(0, (borrower.active_loans ?? 0) - 1),
       })
       .eq("id", borrower.id);
 

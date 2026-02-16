@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -66,7 +66,7 @@ import { transformBook } from "@/lib/utils/transform";
 
 type Book = ReturnType<typeof transformBook>;
 
-export default function BooksPage() {
+function BooksPageContent() {
   const [books, setBooks] = useState<Book[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1167,6 +1167,19 @@ export default function BooksPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function BooksPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-8">
+        <div className="h-10 w-48 rounded bg-muted animate-pulse" />
+        <div className="h-64 rounded-lg border border-border bg-muted/30 animate-pulse" />
+      </div>
+    }>
+      <BooksPageContent />
+    </Suspense>
   );
 }
 
