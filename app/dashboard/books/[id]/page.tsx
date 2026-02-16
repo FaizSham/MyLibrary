@@ -1,10 +1,20 @@
 "use client";
 
-import BooksPage from "../page";
+import { useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 
 export default function BookDetailPage() {
-  // This route renders the same BooksPage component
-  // The BooksPage component will detect the book ID from the URL pathname
-  return <BooksPage />;
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string | undefined;
+
+  useEffect(() => {
+    if (id) {
+      // Redirect to search-param format to avoid remount and dialog flicker
+      router.replace(`/dashboard/books?book=${id}`, { scroll: false });
+    }
+  }, [id, router]);
+
+  return null;
 }
 

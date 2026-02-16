@@ -1,11 +1,19 @@
 import type { Database } from "@/lib/supabase/types";
+import type { BookWithCounts } from "@/lib/actions/books";
 
 type Book = Database["public"]["Tables"]["books"]["Row"];
 type Borrower = Database["public"]["Tables"]["borrowers"]["Row"];
 type Loan = Database["public"]["Tables"]["loans"]["Row"];
 
-// Helper function to transform database book to app book format
-export function transformBook(book: Book) {
+// Helper function to transform database book (with unit counts) to app book format
+export function transformBook(book: BookWithCounts) {
+  const availableCount = book.availableCount ?? 0;
+  const loanedCount = book.loanedCount ?? 0;
+  const totalCount = book.totalCount ?? 0;
+
+  const status: "available" | "loaned" | "overdue" =
+    availableCount > 0 ? "available" : loanedCount > 0 ? "loaned" : "available";
+
   return {
     id: book.id,
     title: book.title,
@@ -13,10 +21,11 @@ export function transformBook(book: Book) {
     isbn: book.isbn || "",
     genre: book.genre || "",
     publishedYear: book.published_year || 0,
-    quantity: book.quantity,
-    status: book.status as "available" | "loaned" | "overdue",
-    borrowedBy: book.borrowed_by || undefined,
-    dueDate: book.due_date || undefined,
+    quantity: totalCount,
+    availableCount,
+    loanedCount,
+    totalCount,
+    status,
     coverUrl: book.cover_url || undefined,
   };
 }
@@ -47,8 +56,7 @@ export function transformLoan(
   today.setHours(0, 0, 0, 0);
   const dueDate = new Date(loan.due_date);
   dueDate.setHours(0, 0, 0, 0);
-  
-  // Determine if loan is overdue (active loan past due date)
+
   let status: "active" | "returned" | "overdue" = loan.status as "active" | "returned";
   if (loan.status === "active" && dueDate < today) {
     status = "overdue";
@@ -56,7 +64,8 @@ export function transformLoan(
 
   return {
     id: loan.id,
-    bookId: loan.book_id,
+    bookId: book?.id || "",
+    bookUnitId: loan.book_unit_id,
     borrowerId: loan.borrower_id,
     bookTitle: book?.title || "",
     bookAuthor: book?.author || "",

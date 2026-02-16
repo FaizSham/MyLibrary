@@ -4,12 +4,12 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/lib/supabase/types";
 import { transformLoan } from "@/lib/utils/transform";
+import { getAvailableUnitsForBook } from "@/lib/actions/books";
 
 type Loan = Database["public"]["Tables"]["loans"]["Row"];
-type LoanInsert = Database["public"]["Tables"]["loans"]["Insert"];
-type LoanUpdate = Database["public"]["Tables"]["loans"]["Update"];
 type Book = Database["public"]["Tables"]["books"]["Row"];
 type Borrower = Database["public"]["Tables"]["borrowers"]["Row"];
+type BookUnit = Database["public"]["Tables"]["book_units"]["Row"];
 
 export async function getLoans(filters?: {
   status?: "active" | "returned" | "overdue";
@@ -17,13 +17,16 @@ export async function getLoans(filters?: {
 }) {
   try {
     const supabase = createAdminClient();
-    
-    // Fetch loans with book and borrower data
+
     let query = supabase
       .from("loans")
       .select(`
         *,
-        books (*),
+        book_units (
+          id,
+          status,
+          books (*)
+        ),
         borrowers (*)
       `)
       .order("checkout_date", { ascending: false });
@@ -39,14 +42,13 @@ export async function getLoans(filters?: {
       throw error;
     }
 
-    // Transform loans and apply filters
-    const loans = (data || []).map((loan: any) => {
-      const book = loan.books as Book;
-      const borrower = loan.borrowers as Borrower;
-      return transformLoan(loan as Loan, book, borrower);
+    const loans = (data || []).map((row: any) => {
+      const unit = row.book_units as BookUnit & { books: Book };
+      const book = unit?.books as Book;
+      const borrower = row.borrowers as Borrower;
+      return transformLoan(row as Loan, book, borrower);
     });
 
-    // Apply search filter
     let filteredLoans = loans;
     if (filters?.search) {
       const searchLower = filters.search.toLowerCase();
@@ -59,7 +61,6 @@ export async function getLoans(filters?: {
       );
     }
 
-    // Apply overdue filter (must be active and past due date)
     if (filters?.status === "overdue") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -84,7 +85,11 @@ export async function getLoanById(id: string) {
       .from("loans")
       .select(`
         *,
-        books (*),
+        book_units (
+          id,
+          status,
+          books (*)
+        ),
         borrowers (*)
       `)
       .eq("id", id)
@@ -95,8 +100,10 @@ export async function getLoanById(id: string) {
       throw error;
     }
 
-    const book = (data as any).books as Book;
-    const borrower = (data as any).borrowers as Borrower;
+    const row = data as any;
+    const unit = row.book_units as BookUnit & { books: Book };
+    const book = unit?.books as Book;
+    const borrower = row.borrowers as Borrower;
     const loan = transformLoan(data as Loan, book, borrower);
 
     return { data: loan, error: null };
@@ -114,22 +121,15 @@ export async function createLoan(
   try {
     const supabase = createAdminClient();
 
-    // Validate book exists and is available
-    const { data: book, error: bookError } = await supabase
-      .from("books")
-      .select("*")
-      .eq("id", bookId)
-      .single();
+    const { data: availableUnits, error: unitsError } =
+      await getAvailableUnitsForBook(bookId);
 
-    if (bookError || !book) {
-      throw new Error("Book not found");
+    if (unitsError || !availableUnits || availableUnits.length === 0) {
+      throw new Error("No available copies of this book");
     }
 
-    if (book.status !== "available") {
-      throw new Error("Book is not available for checkout");
-    }
+    const unit = availableUnits[0];
 
-    // Validate borrower exists and is active
     const { data: borrower, error: borrowerError } = await supabase
       .from("borrowers")
       .select("*")
@@ -144,7 +144,6 @@ export async function createLoan(
       throw new Error("Borrower is not active and cannot checkout books");
     }
 
-    // Calculate due date (default: 14 days from today)
     const checkoutDate = new Date().toISOString().split("T")[0];
     const finalDueDate =
       dueDate ||
@@ -152,11 +151,10 @@ export async function createLoan(
         .toISOString()
         .split("T")[0];
 
-    // Create loan
     const { data: loan, error: loanError } = await supabase
       .from("loans")
       .insert({
-        book_id: bookId,
+        book_unit_id: unit.id,
         borrower_id: borrowerId,
         checkout_date: checkoutDate,
         due_date: finalDueDate,
@@ -170,24 +168,17 @@ export async function createLoan(
       throw loanError;
     }
 
-    // Update book status
-    const { error: bookUpdateError } = await supabase
-      .from("books")
-      .update({
-        status: "loaned",
-        borrowed_by: borrower.name,
-        due_date: finalDueDate,
-      })
-      .eq("id", bookId);
+    const { error: unitUpdateError } = await supabase
+      .from("book_units")
+      .update({ status: "loaned" })
+      .eq("id", unit.id);
 
-    if (bookUpdateError) {
-      console.error("Error updating book:", bookUpdateError);
-      // Try to rollback loan creation
+    if (unitUpdateError) {
+      console.error("Error updating unit status:", unitUpdateError);
       await supabase.from("loans").delete().eq("id", loan.id);
-      throw bookUpdateError;
+      throw unitUpdateError;
     }
 
-    // Update borrower loan counts
     const { error: borrowerUpdateError } = await supabase
       .from("borrowers")
       .update({
@@ -198,16 +189,11 @@ export async function createLoan(
 
     if (borrowerUpdateError) {
       console.error("Error updating borrower:", borrowerUpdateError);
-      // Try to rollback
       await supabase.from("loans").delete().eq("id", loan.id);
       await supabase
-        .from("books")
-        .update({
-          status: "available",
-          borrowed_by: null,
-          due_date: null,
-        })
-        .eq("id", bookId);
+        .from("book_units")
+        .update({ status: "available" })
+        .eq("id", unit.id);
       throw borrowerUpdateError;
     }
 
@@ -230,12 +216,15 @@ export async function returnLoan(id: string) {
   try {
     const supabase = createAdminClient();
 
-    // Get loan with book and borrower info
     const { data: loan, error: loanError } = await supabase
       .from("loans")
       .select(`
         *,
-        books (*),
+        book_units (
+          id,
+          status,
+          books (*)
+        ),
         borrowers (*)
       `)
       .eq("id", id)
@@ -245,8 +234,9 @@ export async function returnLoan(id: string) {
       throw new Error("Loan not found");
     }
 
-    const book = (loan as any).books as Book;
-    const borrower = (loan as any).borrowers as Borrower;
+    const row = loan as any;
+    const unit = row.book_units as BookUnit;
+    const borrower = row.borrowers as Borrower;
 
     if ((loan as Loan).status === "returned") {
       throw new Error("Loan has already been returned");
@@ -254,7 +244,6 @@ export async function returnLoan(id: string) {
 
     const returnDate = new Date().toISOString().split("T")[0];
 
-    // Update loan
     const { error: updateLoanError } = await supabase
       .from("loans")
       .update({
@@ -268,19 +257,13 @@ export async function returnLoan(id: string) {
       throw updateLoanError;
     }
 
-    // Update book status
-    const { error: bookUpdateError } = await supabase
-      .from("books")
-      .update({
-        status: "available",
-        borrowed_by: null,
-        due_date: null,
-      })
-      .eq("id", book.id);
+    const { error: unitUpdateError } = await supabase
+      .from("book_units")
+      .update({ status: "available" })
+      .eq("id", unit.id);
 
-    if (bookUpdateError) {
-      console.error("Error updating book:", bookUpdateError);
-      // Try to rollback loan update
+    if (unitUpdateError) {
+      console.error("Error updating unit status:", unitUpdateError);
       await supabase
         .from("loans")
         .update({
@@ -288,10 +271,9 @@ export async function returnLoan(id: string) {
           status: "active",
         })
         .eq("id", id);
-      throw bookUpdateError;
+      throw unitUpdateError;
     }
 
-    // Update borrower active loans count
     const { error: borrowerUpdateError } = await supabase
       .from("borrowers")
       .update({
@@ -301,7 +283,6 @@ export async function returnLoan(id: string) {
 
     if (borrowerUpdateError) {
       console.error("Error updating borrower:", borrowerUpdateError);
-      // Try to rollback
       await supabase
         .from("loans")
         .update({
@@ -310,13 +291,9 @@ export async function returnLoan(id: string) {
         })
         .eq("id", id);
       await supabase
-        .from("books")
-        .update({
-          status: "loaned",
-          borrowed_by: borrower.name,
-          due_date: (loan as Loan).due_date,
-        })
-        .eq("id", book.id);
+        .from("book_units")
+        .update({ status: "loaned" })
+        .eq("id", unit.id);
       throw borrowerUpdateError;
     }
 

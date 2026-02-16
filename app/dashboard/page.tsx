@@ -31,9 +31,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
-import type { Book } from "@/data/mock-books";
-import { getBooks, createBook } from "@/lib/actions/books";
+import { getBooks, createBook, getBookById } from "@/lib/actions/books";
 import { transformBook } from "@/lib/utils/transform";
+
+type Book = ReturnType<typeof transformBook>;
 
 export default function DashboardPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -64,8 +65,8 @@ export default function DashboardPage() {
   // Calculate stats from books
   const mockStats = {
     totalBooks: books.length,
-    activeLoans: books.filter((b) => b.status === "loaned").length,
-    overdueBooks: books.filter((b) => b.status === "overdue").length,
+    activeLoans: books.reduce((sum, b) => sum + (b.loanedCount ?? 0), 0),
+    overdueBooks: 0, // Would need to fetch loans for accurate overdue count
     newMembers: 0, // This would come from borrowers data
   };
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -82,24 +83,27 @@ export default function DashboardPage() {
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
-      const { data, error } = await createBook({
-        title: formData.title,
-        author: formData.author,
-        isbn: formData.isbn,
-        genre: formData.genre,
-        published_year: parseInt(formData.publishedYear),
-        quantity: parseInt(formData.quantity),
-        status: "available",
-      });
+      const quantity = Math.max(1, parseInt(formData.quantity) || 1);
+      const { data, error } = await createBook(
+        {
+          title: formData.title,
+          author: formData.author,
+          isbn: formData.isbn || null,
+          genre: formData.genre || null,
+          published_year: parseInt(formData.publishedYear) || null,
+        },
+        quantity
+      );
 
       if (error) {
         throw error;
       }
 
       if (data) {
-        const newBook = transformBook(data);
+        const { data: fullBook } = await getBookById(data.id);
+        const newBook = fullBook ? transformBook(fullBook) : transformBook({ ...data, availableCount: quantity, loanedCount: 0, totalCount: quantity });
         setBooks([newBook, ...books]);
         setFormData({ title: "", author: "", isbn: "", genre: "", publishedYear: "", quantity: "1" });
         setIsDialogOpen(false);

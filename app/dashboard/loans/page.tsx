@@ -60,14 +60,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Loan } from "@/data/mock-loans";
 import { getLoans, createLoan, returnLoan } from "@/lib/actions/loans";
 import { getBooks } from "@/lib/actions/books";
 import { getBorrowers } from "@/lib/actions/borrowers";
-import { transformBook } from "@/lib/utils/transform";
-import { transformBorrower } from "@/lib/utils/transform";
-import type { Book } from "@/data/mock-books";
-import type { Borrower } from "@/data/mock-borrowers";
+import { transformBook, transformBorrower } from "@/lib/utils/transform";
+
+type Loan = {
+  id: string;
+  bookId: string;
+  borrowerId: string;
+  bookTitle: string;
+  bookAuthor: string;
+  borrowerName: string;
+  borrowerMemberId: string;
+  checkoutDate: string;
+  dueDate: string;
+  returnDate?: string;
+  status: "active" | "returned" | "overdue";
+};
+
+type Book = ReturnType<typeof transformBook>;
+type Borrower = ReturnType<typeof transformBorrower>;
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);

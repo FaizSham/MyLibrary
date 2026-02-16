@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   BookOpen,
   Plus,
+  Minus,
   Search,
   Edit,
   Trash2,
@@ -60,9 +61,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Book } from "@/data/mock-books";
-import { getBooks, createBook, updateBook, deleteBook } from "@/lib/actions/books";
+import { getBooks, createBook, updateBook, deleteBook, addBookUnits, removeBookUnit, getBookById } from "@/lib/actions/books";
 import { transformBook } from "@/lib/utils/transform";
+
+type Book = ReturnType<typeof transformBook>;
 
 export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -82,6 +84,13 @@ export default function BooksPage() {
   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
   const [copiedBookId, setCopiedBookId] = useState<string | null>(null);
+  const [viewingBookDetail, setViewingBookDetail] = useState<{
+    book: Book;
+    units: { id: string; status: string }[];
+  } | null>(null);
+  const [addCopiesCount, setAddCopiesCount] = useState("1");
+  const [isAddingCopies, setIsAddingCopies] = useState(false);
+  const [isRemovingCopy, setIsRemovingCopy] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -93,13 +102,28 @@ export default function BooksPage() {
 
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Fetch books on mount
+  // Derive book ID from URL: search param (no remount) or path segment (direct link)
+  const bookIdFromUrl = useMemo(() => {
+    const fromSearch = searchParams.get("book");
+    if (fromSearch) return fromSearch;
+    const segments = pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && last !== "books" && last !== "dashboard") return last;
+    return null;
+  }, [pathname, searchParams]);
+
+  // Fetch books on mount and when filters change
   useEffect(() => {
     const fetchBooks = async () => {
       setIsInitialLoad(true);
       try {
-        const { data, error } = await getBooks();
+        const filters =
+          statusFilter !== "all"
+            ? { status: statusFilter as "available" | "loaned" | "overdue" }
+            : undefined;
+        const { data, error } = await getBooks(filters);
         if (error) {
           toast.error("Failed to load books", {
             description: error.message || "Please try again later.",
@@ -116,39 +140,55 @@ export default function BooksPage() {
       }
     };
     fetchBooks();
-  }, []);
+  }, [statusFilter]);
 
-  const handleOpenViewDialog = (book: Book) => {
+  const handleOpenViewDialog = async (book: Book) => {
+    // Prevent reopening if already open for this book
+    if (viewingBook?.id === book.id && isViewDialogOpen) {
+      return;
+    }
     setViewingBook(book);
     setIsViewDialogOpen(true);
-    // Update URL to include book ID
-    router.push(`/dashboard/books/${book.id}`, { scroll: false });
+    // Use search params to avoid route change/remount (stays on /dashboard/books)
+    router.push(`/dashboard/books?book=${book.id}`, { scroll: false });
+    const { data } = await getBookById(book.id);
+    if (data && "book_units" in data) {
+      const raw = data as { book_units?: { id: string; status: string }[] };
+      setViewingBookDetail({
+        book: transformBook(data),
+        units: raw.book_units || [],
+      });
+    } else if (data) {
+      setViewingBookDetail({ book: transformBook(data), units: [] });
+    }
   };
 
-  // Check URL path on mount and open book view if book ID is present
+  // Sync dialog with URL: open when ?book=id or /books/[id], close when no book in URL
   useEffect(() => {
-    const pathSegments = pathname.split("/").filter(Boolean);
-    const bookIdFromPath = pathSegments[pathSegments.length - 1];
-    
-    // Check if the last segment is a book ID (not "books" itself)
-    if (bookIdFromPath && bookIdFromPath !== "books" && bookIdFromPath !== "dashboard") {
-      const book = books.find((b) => b.id === bookIdFromPath);
-      if (book) {
-        // Only open dialog if not already viewing this book
-        if (!viewingBook || viewingBook.id !== book.id) {
-          setViewingBook(book);
-          setIsViewDialogOpen(true);
-        }
+    if (bookIdFromUrl) {
+      const book = books.find((b) => b.id === bookIdFromUrl);
+      if (book && (!viewingBook || viewingBook.id !== book.id)) {
+        setViewingBook(book);
+        setIsViewDialogOpen(true);
+        getBookById(book.id).then(({ data }) => {
+          if (data && "book_units" in data) {
+            const raw = data as { book_units?: { id: string; status: string }[] };
+            setViewingBookDetail({
+              book: transformBook(data),
+              units: raw.book_units || [],
+            });
+          } else if (data) {
+            setViewingBookDetail({ book: transformBook(data), units: [] });
+          }
+        });
       }
-    } else {
-      // If URL doesn't have book ID, close dialog if open
-      if (viewingBook && pathname === "/dashboard/books") {
-        setIsViewDialogOpen(false);
-        setViewingBook(null);
-      }
+    } else if (pathname === "/dashboard/books" && viewingBook) {
+      setIsViewDialogOpen(false);
+      setViewingBook(null);
+      setViewingBookDetail(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [bookIdFromUrl, pathname, books]);
 
   // Filter books based on search and status
   const filteredBooks = useMemo(() => {
@@ -206,7 +246,7 @@ export default function BooksPage() {
       isbn: book.isbn,
       genre: book.genre,
       publishedYear: String(book.publishedYear),
-      quantity: String(book.quantity),
+      quantity: String(book.totalCount ?? book.quantity),
     });
     setIsDialogOpen(true);
   };
@@ -214,29 +254,32 @@ export default function BooksPage() {
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      const { data, error } = await createBook({
-        title: formData.title,
-        author: formData.author,
-        isbn: formData.isbn,
-        genre: formData.genre,
-        published_year: parseInt(formData.publishedYear),
-        quantity: parseInt(formData.quantity),
-        status: "available",
-      });
+      const quantity = Math.max(1, parseInt(formData.quantity) || 1);
+      const { data, error } = await createBook(
+        {
+          title: formData.title,
+          author: formData.author,
+          isbn: formData.isbn || null,
+          genre: formData.genre || null,
+          published_year: parseInt(formData.publishedYear) || null,
+        },
+        quantity
+      );
 
       if (error) {
         throw error;
       }
 
       if (data) {
-        const newBook = transformBook(data);
+        const { data: fullBook } = await getBookById(data.id);
+        const newBook = fullBook ? transformBook(fullBook) : transformBook({ ...data, availableCount: quantity, loanedCount: 0, totalCount: quantity });
         setBooks([newBook, ...books]);
         resetForm();
         setIsDialogOpen(false);
         toast.success("Book added successfully", {
-          description: `${newBook.title} by ${newBook.author} has been added to your collection.`,
+          description: `${newBook.title} by ${newBook.author} (${quantity} cop${quantity === 1 ? "y" : "ies"}) has been added.`,
         });
       }
     } catch (error) {
@@ -257,10 +300,9 @@ export default function BooksPage() {
       const { data, error } = await updateBook(editingBook.id, {
         title: formData.title,
         author: formData.author,
-        isbn: formData.isbn,
-        genre: formData.genre,
-        published_year: parseInt(formData.publishedYear),
-        quantity: parseInt(formData.quantity),
+        isbn: formData.isbn || null,
+        genre: formData.genre || null,
+        published_year: parseInt(formData.publishedYear) || null,
       });
 
       if (error) {
@@ -268,8 +310,15 @@ export default function BooksPage() {
       }
 
       if (data) {
-        const updatedBook = transformBook(data);
+        const { data: fullBook } = await getBookById(editingBook.id);
+        const updatedBook = fullBook ? transformBook(fullBook) : transformBook({ ...data, availableCount: editingBook.availableCount, loanedCount: editingBook.loanedCount, totalCount: editingBook.totalCount });
         setBooks(books.map((book) => (book.id === editingBook.id ? updatedBook : book)));
+        if (viewingBook?.id === editingBook.id) {
+          setViewingBook(updatedBook);
+          if (viewingBookDetail?.book.id === editingBook.id) {
+            setViewingBookDetail({ ...viewingBookDetail, book: updatedBook });
+          }
+        }
         resetForm();
         setIsDialogOpen(false);
         toast.success("Book updated successfully", {
@@ -296,7 +345,7 @@ export default function BooksPage() {
     setIsViewDialogOpen(open);
     if (!open) {
       setViewingBook(null);
-      // Reset URL to base books page when closing dialog
+      setViewingBookDetail(null);
       router.replace("/dashboard/books", { scroll: false });
     }
   };
@@ -497,19 +546,21 @@ export default function BooksPage() {
                           disabled={isLoading}
                         />
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="quantity">Quantity <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={formData.quantity}
-                          onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                          required
-                          disabled={isLoading}
-                        />
-                      </div>
+                      {dialogMode === "add" && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="quantity">Initial Copies <span className="text-destructive">*</span></Label>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={formData.quantity}
+                            onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -581,48 +632,115 @@ export default function BooksPage() {
                             <p className="text-sm font-medium">{viewingBook.publishedYear}</p>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Quantity</Label>
-                            <p className="text-sm font-medium">{viewingBook.quantity}</p>
+                            <Label className="text-xs text-muted-foreground">Copies</Label>
+                            <p className="text-sm font-medium">
+                              {viewingBook.availableCount ?? viewingBook.quantity} available / {viewingBook.totalCount ?? viewingBook.quantity} total
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {(viewingBook.status === "loaned" || viewingBook.status === "overdue") && (
-                       <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Loan Status</h4>
-                        <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-4">
-                          {viewingBook.borrowedBy && (
-                            <div className="flex items-start gap-3">
-                              <div className="p-2 bg-background rounded-full shadow-sm border border-border">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="space-y-0.5">
-                                <p className="text-xs font-medium text-muted-foreground">Borrowed By</p>
-                                <p className="text-sm font-semibold">{viewingBook.borrowedBy}</p>
-                              </div>
-                            </div>
-                          )}
-                          {viewingBook.dueDate && (
-                            <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-full shadow-sm border ${viewingBook.status === "overdue" ? "bg-destructive/10 border-destructive/20" : "bg-background border-border"}`}>
-                                <Calendar className={`h-4 w-4 ${viewingBook.status === "overdue" ? "text-destructive" : "text-muted-foreground"}`} />
-                              </div>
-                              <div className="space-y-0.5">
-                                <p className="text-xs font-medium text-muted-foreground">Due Date</p>
-                                <p className={`text-sm font-semibold ${viewingBook.status === "overdue" ? "text-destructive" : ""}`}>
-                                  {new Date(viewingBook.dueDate).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Manage Copies</h4>
+                      <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Add copies:</span>
+                          <Input
+                            type="number"
+                            min="1"
+                            className="w-20"
+                            value={addCopiesCount}
+                            onChange={(e) => setAddCopiesCount(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              if (!viewingBook) return;
+                              setIsAddingCopies(true);
+                              try {
+                                const count = Math.max(1, parseInt(addCopiesCount) || 1);
+                                const { error } = await addBookUnits(viewingBook.id, count);
+                                if (error) throw error;
+                                const { data } = await getBookById(viewingBook.id);
+                                const updated = data ? transformBook(data) : viewingBook;
+                                setBooks(books.map((b) => (b.id === viewingBook.id ? updated : b)));
+                                setViewingBook(updated);
+                                setViewingBookDetail((prev) =>
+                                  prev && prev.book.id === viewingBook.id
+                                    ? { ...prev, book: updated }
+                                    : prev
+                                );
+                                toast.success(`Added ${count} cop${count === 1 ? "y" : "ies"}`);
+                              } catch (err) {
+                                toast.error("Failed to add copies", {
+                                  description: err instanceof Error ? err.message : undefined,
+                                });
+                              } finally {
+                                setIsAddingCopies(false);
+                              }
+                            }}
+                            disabled={isAddingCopies}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
                         </div>
+                        {(viewingBookDetail?.units.filter((u) => u.status === "available") ?? []).length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-sm text-muted-foreground">Remove an available copy:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {viewingBookDetail?.units
+                                .filter((u) => u.status === "available")
+                                .slice(0, 5)
+                                .map((unit) => (
+                                  <Button
+                                    key={unit.id}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      setIsRemovingCopy(unit.id);
+                                      try {
+                                        const { error } = await removeBookUnit(unit.id);
+                                        if (error) throw error;
+                                        const { data } = await getBookById(viewingBook!.id);
+                                        const updated = data ? transformBook(data) : viewingBook!;
+                                        setBooks(books.map((b) => (b.id === viewingBook!.id ? updated : b)));
+                                        setViewingBook(updated);
+                                        const raw = data as { book_units?: { id: string; status: string }[] };
+                                        setViewingBookDetail({
+                                          book: updated,
+                                          units: raw?.book_units ?? [],
+                                        });
+                                        toast.success("Copy removed");
+                                      } catch (err) {
+                                        toast.error("Failed to remove copy", {
+                                          description: err instanceof Error ? err.message : undefined,
+                                        });
+                                      } finally {
+                                        setIsRemovingCopy(null);
+                                      }
+                                    }}
+                                    disabled={isRemovingCopy === unit.id}
+                                  >
+                                    <Minus className="h-4 w-4 mr-1" />
+                                    Remove
+                                  </Button>
+                                ))}
+                              {(viewingBookDetail?.units.filter((u) => u.status === "available").length ?? 0) > 5 && (
+                                <span className="text-xs text-muted-foreground self-center">+ more</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(viewingBookDetail?.units.filter((u) => u.status === "available").length ?? 0) === 0 &&
+                          (viewingBookDetail?.units.length ?? 0) > 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              No available copies to remove. All copies are on loan.
+                            </p>
+                          )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
@@ -795,7 +913,7 @@ export default function BooksPage() {
                     <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">ISBN</TableHead>
                     <TableHead className="text-muted-foreground font-semibold uppercase tracking-wider">Genre</TableHead>
                     <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Year</TableHead>
-                    <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Quantity</TableHead>
+                    <TableHead className="w-[100px] text-muted-foreground font-semibold uppercase tracking-wider">Copies</TableHead>
                     <TableHead className="w-[120px] text-muted-foreground font-semibold uppercase tracking-wider">Status</TableHead>
                     <TableHead className="w-[100px] text-right text-muted-foreground font-semibold uppercase tracking-wider">Actions</TableHead>
                   </TableRow>
@@ -821,8 +939,16 @@ export default function BooksPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{book.genre}</TableCell>
                       <TableCell className="text-muted-foreground">{book.publishedYear}</TableCell>
-                      <TableCell className="text-muted-foreground">{book.quantity}</TableCell>
-                      <TableCell><StatusBadge status={book.status} /></TableCell>
+                      <TableCell 
+                        className="text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenViewDialog(book);
+                        }}
+                      >
+                        {book.availableCount ?? book.quantity} / {book.totalCount ?? book.quantity}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}><StatusBadge status={book.status} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                           <Button
@@ -888,7 +1014,15 @@ export default function BooksPage() {
                         <StatusBadge status={book.status} />
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-xs text-muted-foreground">Qty: {book.quantity}</span>
+                        <span 
+                          className="text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenViewDialog(book);
+                          }}
+                        >
+                          {book.availableCount ?? book.quantity} / {book.totalCount ?? book.quantity} copies
+                        </span>
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"

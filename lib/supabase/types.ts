@@ -2,7 +2,7 @@
 // These types will be generated from your Supabase schema
 // For now, we'll define them manually based on the table structure
 
-export type BookStatus = "available" | "loaned" | "overdue";
+export type BookUnitStatus = "available" | "loaned" | "maintenance";
 export type BorrowerStatus = "active" | "inactive" | "suspended";
 export type LoanStatus = "active" | "returned";
 
@@ -17,10 +17,6 @@ export interface Database {
           isbn: string | null;
           genre: string | null;
           published_year: number | null;
-          quantity: number;
-          status: BookStatus;
-          borrowed_by: string | null;
-          due_date: string | null;
           cover_url: string | null;
           created_at: string;
           updated_at: string;
@@ -32,10 +28,6 @@ export interface Database {
           isbn?: string | null;
           genre?: string | null;
           published_year?: number | null;
-          quantity?: number;
-          status?: BookStatus;
-          borrowed_by?: string | null;
-          due_date?: string | null;
           cover_url?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -47,11 +39,30 @@ export interface Database {
           isbn?: string | null;
           genre?: string | null;
           published_year?: number | null;
-          quantity?: number;
-          status?: BookStatus;
-          borrowed_by?: string | null;
-          due_date?: string | null;
           cover_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      book_units: {
+        Row: {
+          id: string;
+          book_id: string;
+          status: BookUnitStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          book_id: string;
+          status?: BookUnitStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          book_id?: string;
+          status?: BookUnitStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -103,7 +114,7 @@ export interface Database {
       loans: {
         Row: {
           id: string;
-          book_id: string;
+          book_unit_id: string;
           borrower_id: string;
           status: LoanStatus;
           checkout_date: string;
@@ -114,7 +125,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          book_id: string;
+          book_unit_id: string;
           borrower_id: string;
           status?: LoanStatus;
           checkout_date?: string;
@@ -125,7 +136,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          book_id?: string;
+          book_unit_id?: string;
           borrower_id?: string;
           status?: LoanStatus;
           checkout_date?: string;
