@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Bell, ChevronRight, Home } from "lucide-react";
@@ -19,6 +20,7 @@ import { Sidebar } from "./sidebar";
 export function Header() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Helper to format segment names (e.g., "new-books" -> "New Books")
   const formatSegment = (segment: string) => {
@@ -34,7 +36,7 @@ export function Header() {
       <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-x-4 border-b border-border bg-background/80 backdrop-blur-md px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4 lg:gap-6">
           {/* Mobile Menu Trigger */}
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden -ml-2 text-muted-foreground hover:text-foreground">
                 <Menu className="h-5 w-5" />
@@ -42,7 +44,7 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
-              <Sidebar mobile />
+              <Sidebar mobile onNavigate={() => setIsMobileMenuOpen(false)} />
             </SheetContent>
           </Sheet>
 

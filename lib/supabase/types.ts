@@ -4,6 +4,7 @@
 
 export type BookStatus = "available" | "loaned" | "overdue";
 export type BorrowerStatus = "active" | "inactive" | "suspended";
+export type LoanStatus = "active" | "returned";
 
 export interface Database {
   public: {
@@ -95,6 +96,41 @@ export interface Database {
           total_loans?: number;
           status?: BorrowerStatus;
           fine_amount?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      loans: {
+        Row: {
+          id: string;
+          book_id: string;
+          borrower_id: string;
+          status: LoanStatus;
+          checkout_date: string;
+          due_date: string;
+          return_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          book_id: string;
+          borrower_id: string;
+          status?: LoanStatus;
+          checkout_date?: string;
+          due_date: string;
+          return_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          book_id?: string;
+          borrower_id?: string;
+          status?: LoanStatus;
+          checkout_date?: string;
+          due_date?: string;
+          return_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };

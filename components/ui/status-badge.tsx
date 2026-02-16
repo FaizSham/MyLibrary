@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 
 type BookStatus = "available" | "loaned" | "overdue";
 type BorrowerStatus = "active" | "inactive" | "suspended";
-type Status = BookStatus | BorrowerStatus;
+type LoanStatus = "active" | "returned" | "overdue";
+type Status = BookStatus | BorrowerStatus | LoanStatus;
 
 interface StatusBadgeProps {
   status: Status;
@@ -37,6 +38,12 @@ const statusConfig: Record<Status, { variant: "default" | "secondary" | "destruc
     variant: "destructive",
     className: "bg-destructive/10 text-destructive border-destructive/20",
   },
+  // Loan statuses
+  returned: {
+    variant: "secondary",
+    className: "bg-muted text-muted-foreground",
+  },
+  // Note: overdue is already defined above for books, reused for loans
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

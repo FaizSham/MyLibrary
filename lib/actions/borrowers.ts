@@ -79,6 +79,7 @@ export async function createBorrower(
       throw error;
     }
 
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/borrowers");
 
     return { data, error: null };
@@ -103,7 +104,9 @@ export async function updateBorrower(id: string, borrowerData: BorrowerUpdate) {
       throw error;
     }
 
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/borrowers");
+    revalidatePath(`/dashboard/borrowers/${id}`);
 
     return { data, error: null };
   } catch (error) {
@@ -122,6 +125,7 @@ export async function deleteBorrower(id: string) {
       throw error;
     }
 
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/borrowers");
 
     return { error: null };

@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/types";
 
 type Book = Database["public"]["Tables"]["books"]["Row"];
 type Borrower = Database["public"]["Tables"]["borrowers"]["Row"];
+type Loan = Database["public"]["Tables"]["loans"]["Row"];
 
 // Helper function to transform database book to app book format
 export function transformBook(book: Book) {
@@ -33,5 +34,37 @@ export function transformBorrower(borrower: Borrower) {
     totalLoans: borrower.total_loans,
     status: borrower.status as "active" | "inactive" | "suspended",
     fineAmount: Number(borrower.fine_amount) || undefined,
+  };
+}
+
+// Helper function to transform database loan to app loan format
+export function transformLoan(
+  loan: Loan,
+  book?: Book,
+  borrower?: Borrower
+) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(loan.due_date);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  // Determine if loan is overdue (active loan past due date)
+  let status: "active" | "returned" | "overdue" = loan.status as "active" | "returned";
+  if (loan.status === "active" && dueDate < today) {
+    status = "overdue";
+  }
+
+  return {
+    id: loan.id,
+    bookId: loan.book_id,
+    borrowerId: loan.borrower_id,
+    bookTitle: book?.title || "",
+    bookAuthor: book?.author || "",
+    borrowerName: borrower?.name || "",
+    borrowerMemberId: borrower?.member_id || "",
+    checkoutDate: loan.checkout_date,
+    dueDate: loan.due_date,
+    returnDate: loan.return_date || undefined,
+    status,
   };
 }

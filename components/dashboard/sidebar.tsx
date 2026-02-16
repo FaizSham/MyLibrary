@@ -8,6 +8,7 @@ import {
   Users,
   Settings,
   Library,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,11 +16,24 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Books", href: "/dashboard/books", icon: BookOpen },
   { name: "Borrowers", href: "/dashboard/borrowers", icon: Users },
+  { name: "Loans", href: "/dashboard/loans", icon: FileText },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+export function Sidebar({ 
+  mobile = false, 
+  onNavigate 
+}: { 
+  mobile?: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+
+  const handleLinkClick = () => {
+    if (mobile && onNavigate) {
+      onNavigate();
+    }
+  };
 
   return (
     <div className={mobile ? "flex flex-col h-full" : "hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col"}>
@@ -43,6 +57,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                     <li key={item.name}>
                       <Link
                         href={item.href}
+                        onClick={handleLinkClick}
                         className={cn(
                           "group flex gap-x-3 rounded-lg p-2 text-sm leading-6 font-semibold transition-colors",
                           isActive
