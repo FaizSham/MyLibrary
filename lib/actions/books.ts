@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/lib/supabase/types";
 
@@ -24,7 +24,7 @@ export async function getBooks(filters?: {
   search?: string;
 }) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     let query = supabase
       .from("books")
       .select(`
@@ -74,7 +74,7 @@ export async function getBooks(filters?: {
 
 export async function getBookById(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("books")
       .select(`
@@ -115,7 +115,7 @@ export async function createBook(
   quantity: number = 1
 ) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data: book, error: bookError } = await supabase
       .from("books")
       .insert(bookData)
@@ -153,7 +153,7 @@ export async function createBook(
 
 export async function updateBook(id: string, bookData: BookUpdate) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("books")
       .update(bookData)
@@ -179,7 +179,7 @@ export async function updateBook(id: string, bookData: BookUpdate) {
 
 export async function deleteBook(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { error } = await supabase.from("books").delete().eq("id", id);
 
     if (error) {
@@ -199,7 +199,7 @@ export async function deleteBook(id: string) {
 
 export async function addBookUnits(bookId: string, count: number) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const qty = Math.max(1, count);
     const units = Array.from({ length: qty }, () => ({
       book_id: bookId,
@@ -226,7 +226,7 @@ export async function addBookUnits(bookId: string, count: number) {
 
 export async function removeBookUnit(unitId: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
 
     const { data: unit, error: fetchError } = await supabase
       .from("book_units")
@@ -265,7 +265,7 @@ export async function removeBookUnit(unitId: string) {
 
 export async function getAvailableUnitsForBook(bookId: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("book_units")
       .select("id, book_id, status")

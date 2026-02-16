@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/lib/supabase/types";
 import { transformLoan } from "@/lib/utils/transform";
@@ -16,7 +16,7 @@ export async function getLoans(filters?: {
   search?: string;
 }) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
 
     let query = supabase
       .from("loans")
@@ -80,7 +80,7 @@ export async function getLoans(filters?: {
 
 export async function getLoanById(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("loans")
       .select(`
@@ -119,7 +119,7 @@ export async function createLoan(
   dueDate?: string
 ) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
 
     const { data: availableUnits, error: unitsError } =
       await getAvailableUnitsForBook(bookId);
@@ -214,7 +214,7 @@ export async function createLoan(
 
 export async function returnLoan(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
 
     const { data: loan, error: loanError } = await supabase
       .from("loans")

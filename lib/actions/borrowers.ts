@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Database } from "@/lib/supabase/types";
 
@@ -13,7 +13,7 @@ export async function getBorrowers(filters?: {
   search?: string;
 }) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     let query = supabase.from("borrowers").select("*").order("created_at", { ascending: false });
 
     if (filters?.status) {
@@ -42,7 +42,7 @@ export async function getBorrowers(filters?: {
 
 export async function getBorrowerById(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.from("borrowers").select("*").eq("id", id).single();
 
     if (error) {
@@ -61,7 +61,7 @@ export async function createBorrower(
   borrowerData: Omit<BorrowerInsert, "id" | "created_at" | "updated_at" | "active_loans" | "total_loans">
 ) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("borrowers")
       .insert({
@@ -91,7 +91,7 @@ export async function createBorrower(
 
 export async function updateBorrower(id: string, borrowerData: BorrowerUpdate) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("borrowers")
       .update(borrowerData)
@@ -117,7 +117,7 @@ export async function updateBorrower(id: string, borrowerData: BorrowerUpdate) {
 
 export async function deleteBorrower(id: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { error } = await supabase.from("borrowers").delete().eq("id", id);
 
     if (error) {
